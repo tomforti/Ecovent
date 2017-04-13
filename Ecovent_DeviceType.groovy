@@ -311,47 +311,44 @@ private prefsResponse(resp) {
 }  
 
 def setCoolingSetpoint(temp) {
-	sendEvent(name: 'thermostatSetpoint', value: temp)
+	log.debug "Setting set point up to: ${newSetpoint}"
+    def newSetpointCel = Math.round((temp - 32) / 1.8)
+  	sendEvent(name: 'thermostatSetpoint', value: temp)
     sendEvent(name: 'heatingSetpoint', value: temp)
     sendEvent(name: 'coolingSetpoint', value: temp)
-    int newSetpoint = device.currentValue("thermostatSetpoint")
-  	log.debug "Setting set point up to: ${newSetpoint}"
-  	def newSetpointCel = (newSetpoint - 32) / 1.8
-  	def myArray=[
-    	id:state.roomid, 
-    	setpoint:newSetpointCel,
-  	]  
-  	def myData = [ room_prefs:[myArray]]
-  	def builder = new groovy.json.JsonBuilder(myData)
-  	def jsonStr = builder.toString()
-  	api('temperature', jsonStr) 
-  	poll()
+    def myArray=[
+      id:state.roomid, 
+      setpoint:newSetpointCel,
+    ]  
+    def myData = [ room_prefs:[myArray]]
+    def builder = new groovy.json.JsonBuilder(myData)
+    def jsonStr = builder.toString()
+    api('temperature', jsonStr) 
+    poll()
 }
 
 def setHeatingSetpoint(temp) {
-	sendEvent(name: 'thermostatSetpoint', value: temp)
+	log.debug "Setting set point up to: ${temp}"
+    def newSetpointCel = Math.round((temp - 32) / 1.8)
+  	sendEvent(name: 'thermostatSetpoint', value: temp)
     sendEvent(name: 'heatingSetpoint', value: temp)
     sendEvent(name: 'coolingSetpoint', value: temp)
-    int newSetpoint = device.currentValue("thermostatSetpoint")
-  	log.debug "Setting set point up to: ${newSetpoint}"
-  	def newSetpointCel = (newSetpoint - 32) / 1.8
-  	def myArray=[
-    	id:state.roomid, 
-    	setpoint:newSetpointCel,
-  	]  
-  	def myData = [ room_prefs:[myArray]]
-  	def builder = new groovy.json.JsonBuilder(myData)
-  	def jsonStr = builder.toString()
-  	api('temperature', jsonStr) 
-  	poll()
+    def myArray=[
+      id:state.roomid, 
+      setpoint:newSetpointCel,
+    ]  
+    def myData = [ room_prefs:[myArray]]
+    def builder = new groovy.json.JsonBuilder(myData)
+    def jsonStr = builder.toString()
+    api('temperature', jsonStr) 
+    poll()
 }
 
 def poll() {
+  structure()
   log.debug "Executing 'poll'"
   api('status', [])
   api('prefs', [])
-  structure()
-  
 }
 
  def login(method = null, args = [], success = {}) {
@@ -398,5 +395,4 @@ def poll() {
 
    }
  }
-
 
