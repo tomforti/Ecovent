@@ -1,5 +1,5 @@
 /*
- *  Ecovent 
+ *  Ecovent
  *
  *  Copyright 2017, Tom Forti
  *
@@ -27,12 +27,6 @@ import groovy.json.JsonOutput
     command "setignore"
     command "setpointUp"
     command "setpointDown"
-    command "heat"
-    command "cool"
-    command "fanon"
-    command "fanauto"
-    command "setHeatingSetpoint"
-    command "setCoolingSetpoint"
   }
      tiles(scale: 2) {
   multiAttributeTile(name:"temperature", type:"thermostat", width: 6, height: 4) {
@@ -91,8 +85,8 @@ import groovy.json.JsonOutput
     state "heat", action:"cool", icon: "st.thermostat.heat"
   }
   standardTile("thermostatFanMode", "device.thermostatFanMode", decoration: "flat", width: 2, height: 2) {
-    state "on", action:"fanauto", icon: "st.thermostat.fan-on"
-    state "auto", action:"fanon", icon: "st.thermostat.fan-auto"
+    state "on", action:"fanAuto", icon: "st.thermostat.fan-on"
+    state "auto", action:"fanOn", icon: "st.thermostat.fan-auto"
   }
   standardTile("setignore", "device.ignore", decoration: "flat", width: 2, height: 2) {
     state 'false', label:'home', action:"away", icon: "st.Home.home2"
@@ -103,296 +97,55 @@ import groovy.json.JsonOutput
   }
   valueTile("humidity", "device.humidity", width: 2, height: 2) {
     state "default", label:'${currentValue}%', unit:"Humidity"
-  }  
+  }
   standardTile("hiddenIconTile", "device.temperature", decoration: "flat", width: 2, height: 2, canChangeIcon: true, canChangeBackground: true) {
     state "default", label:'${currentValue}°', icon: "st.Weather.weather2", backgroundColor: "#79B821"
   }
-
   main("hiddenIconTile")
   details(["temperature", "spacerTile", "setpointDown", "setpointUp", "spacerTile", "thermostatMode", "thermostatSetpoint", "refresh", "setignore", "thermostatFanMode"])
      }
  }
 
-def parse(String description) {
- }
-
-def away() {	
-  log.debug "Room Status: Away"
-  sendEvent(name: 'ignore', value: true)
-   def myArray=[
-    id:state.roomid, 
-    ignore:true,
-  ]  
-  def myData = [ room_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('ignore', jsonStr) 
-  poll()
+def away() {
+  parent.away(this)
  }
 
 def home() {
-  log.debug "Room Status: In Use"
-  sendEvent(name: 'ignore', value: false)
-  def myArray=[
-    id:state.roomid, 
-    ignore:false,
-  ]  
-  def myData = [ room_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('ignore', jsonStr)
-  poll()
+  parent.home(this)
  }
 
 def setpointUp(){
-  int newSetpoint = device.currentValue("thermostatSetpoint") + 1
-  sendEvent(name: 'thermostatSetpoint', value: newSetpoint)
-  sendEvent(name: 'coolingSetpoint', value: newSetpoint)
-  sendEvent(name: 'heatingSetpoint', value: newSetpoint)
-  log.debug "Setting set point up to: ${newSetpoint}"
-  def newSetpointCel = (newSetpoint - 32) / 1.8
-  def myArray=[
-    id:state.roomid, 
-    setpoint:newSetpointCel,
-]  
-def myData = [ room_prefs:[myArray]]
-def builder = new groovy.json.JsonBuilder(myData)
-def jsonStr = builder.toString()
-api('temperature', jsonStr) 
-poll()
+  parent.setpointUp(this)
  }
 
 def setpointDown(){
-  int newSetpoint = device.currentValue("thermostatSetpoint") - 1
-  sendEvent(name: 'thermostatSetpoint', value: newSetpoint)
-  sendEvent(name: 'coolingSetpoint', value: newSetpoint)
-  sendEvent(name: 'heatingSetpoint', value: newSetpoint)
-  log.debug "Setting set point up to: ${newSetpoint}"
-  def newSetpointCel = (newSetpoint - 32) / 1.8
-  def myArray=[
-    id:state.roomid, 
-    setpoint:newSetpointCel,
-  ]  
-  def myData = [ room_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('temperature', jsonStr) 
-  poll()
+  parent.setpointDown(this)
  }
 
 def heat() {
-  sendEvent(name: 'thermostatMode', value: heat)
-  log.debug "Setting Mode to heat" 
-  def myArray=[
-    id:state.statid, 
-    mode:"heat",
-  ]  
-  def myData = [ thermostat_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('stat', jsonStr)
-  poll()
+  parent.heat()
  }
 
 def cool() {
-  sendEvent(name: 'thermostatMode', value: cool)
-  log.debug "Setting Mode to cool" 
-  def myArray=[
-    id:state.statid, 
-    mode:"cool",
-  ]  
-  def myData = [ thermostat_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('stat', jsonStr)
-  poll()
+  parent.cool()
  }
 
-def fanon() {
-  sendEvent(name: 'thermostatFanMode', value: on)
-  log.debug "Setting Fan to on" 
-  def myArray=[
-    id:state.statid, 
-    fan:"on",
-  ]  
-  def myData = [ thermostat_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('stat', jsonStr)
-  poll()
+def fanOn() {
+  parent.fanOn()
  }
 
-def fanauto() {
-  sendEvent(name: 'thermostatFanMode', value: auto)
-  log.debug "Setting Fan to auto" 
-  def myArray=[
-    id:state.statid, 
-    fan:"auto",
-  ]  
-  def myData = [ thermostat_prefs:[myArray]]
-  def builder = new groovy.json.JsonBuilder(myData)
-  def jsonStr = builder.toString()
-  api('stat', jsonStr)
-  poll()
+def fanAuto() {
+  parent.fanAuto()
  }
-
-def api(method, args = [], success = {}) {
-  log.debug "Logged in"
-  def methods = [
-    'status': [uri: "https://cloud.ecovent.io/remote/v1/status", type: 'getstatus'],
-    'prefs': [uri: "https://cloud.ecovent.io/remote/v1/prefs", type: 'getprefs'],
-    'ignore': [uri: "https://cloud.ecovent.io/remote/v1/room_prefs", type: 'put'],
-    'stat': [uri: "https://cloud.ecovent.io/remote/v1/thermostat_prefs", type: 'put'],
-    'temperature': [uri: "https://cloud.ecovent.io/remote/v1/room_prefs", type: 'put']
-  ]
-  def request = methods.getAt(method)
-  doRequest(request.uri, args, request.type, success)
- }
-
- // Need to be logged in before this is called. So don't call this. Call api.
-def doRequest(uri, args, type, success) {
-  log.debug "Calling $type : $uri : $args"
-  def params = [
-    uri: uri,
-    requestContentType: "application/json",
-    headers: ['Authorization': "token=${data.auth.cloud_authorization}"],
-    body: args
-  ]
-    if (type == 'put') {
-      httpPut(params) { resp ->
-      log.debug("Put status: "+resp.status)
-      }
-    } else if (type == 'getstatus') {
-      httpGet(params) { resp ->
-        statusResponse(resp)
-        }  
-	 } else if (type == 'getprefs') {
-      httpGet(params) { resp ->
-        prefsResponse(resp)
-        }
-      } 
-      else {
-        log.debug("error")
-      }
-    
- }
-
-private statusResponse(resp) {
-  if(resp.status == 200) {
-        log.debug("Get status: "+resp.status)
-        def id = resp.data.room_status[state.roomid - 1].id //improve this
-        def humid = Math.round(resp.data.room_status[state.roomid - 1].humidity)
-      	def temp = Math.round((resp.data.room_status[state.roomid - 1].temp * 1.8 ) + 32)
-      	sendEvent(name: 'humidity', value: humid)
-      	sendEvent(name: 'thermostatFanMode', value: fanMode)
-      	sendEvent(name: 'thermostatMode', value: statMode)
-      	sendEvent(name: 'temperature', value: temp)
-    }else{
-        log.debug("Get status: "+resp.status)
-    }
-}
-
-private prefsResponse(resp) {
-  if(resp.status == 200) {
-        log.debug("Get Prefs: "+resp.status)
-    	def statMode = resp.data.mode
-      	def fanMode = resp.data.thermostat_prefs[0].fan //improve this
-      	def roomset = Math.round((resp.data.room_prefs[state.roomid - 1].setpoint * 1.8 ) + 32) //improves this
-      	def ignore = resp.data.room_prefs[state.roomid - 1].ignore //improve this
-      	sendEvent(name: 'thermostatFanMode', value: fanMode)
-      	sendEvent(name: 'thermostatMode', value: statMode)
-      	sendEvent(name: 'thermostatSetpoint', value: roomset)
-      	sendEvent(name: 'heatingSetpoint', value: roomset)
-      	sendEvent(name: 'coolingSetpoint', value: roomset)
-      	sendEvent(name: 'ignore', value: ignore)
-    }else{
-        log.debug("Get status: "+resp.status)
-    }
-}  
 
 def setCoolingSetpoint(temp) {
-	log.debug "Setting set point up to: ${newSetpoint}"
-    def newSetpointCel = Math.round((temp - 32) / 1.8)
-  	sendEvent(name: 'thermostatSetpoint', value: temp)
-    sendEvent(name: 'heatingSetpoint', value: temp)
-    sendEvent(name: 'coolingSetpoint', value: temp)
-    def myArray=[
-      id:state.roomid, 
-      setpoint:newSetpointCel,
-    ]  
-    def myData = [ room_prefs:[myArray]]
-    def builder = new groovy.json.JsonBuilder(myData)
-    def jsonStr = builder.toString()
-    api('temperature', jsonStr) 
-    poll()
+  parent.setCoolingSetpoint(temp, this)
 }
 
 def setHeatingSetpoint(temp) {
-	log.debug "Setting set point up to: ${temp}"
-    def newSetpointCel = Math.round((temp - 32) / 1.8)
-  	sendEvent(name: 'thermostatSetpoint', value: temp)
-    sendEvent(name: 'heatingSetpoint', value: temp)
-    sendEvent(name: 'coolingSetpoint', value: temp)
-    def myArray=[
-      id:state.roomid, 
-      setpoint:newSetpointCel,
-    ]  
-    def myData = [ room_prefs:[myArray]]
-    def builder = new groovy.json.JsonBuilder(myData)
-    def jsonStr = builder.toString()
-    api('temperature', jsonStr) 
-    poll()
+    parent.setHeatingSetpoint(temp, this)
 }
 
 def poll() {
-  structure()
-  log.debug "Executing 'poll'"
-  api('status', [])
-  api('prefs', [])
+  parent.devicePoll(this)
 }
-
- def login(method = null, args = [], success = {}) {
-  def jsonbody = new groovy.json.JsonOutput().toJson([email: settings.username, password: settings.password])
-  def params = [
-    uri: "https://cloud.ecovent.io/api/v1/session",
-    requestContentType: "application/json",
-    body: jsonbody
-  ]
-  httpPost(params) {response ->
-    if (response.status != 200 ) {
-      log.debug "Ecovent logging failed, status = ${response.status}"
-    }
-    else {
-    data.auth = response.data
-    log.debug data.auth
-    structure()
-    api(method, args, success)
-  }
-  }
- }
-
- def structure() {
-   def params = [
-    uri: "https://cloud.ecovent.io/remote/v1/structure",
-    requestContentType: "application/json",
-    headers: ['Authorization': "token=${data.auth.cloud_authorization}"],
-    ]
-   httpGet(params) {resp ->
-    if (resp.status != 200 ) {
-      log.debug "Failed to get structure, status = ${resp.status}"
-    }
-    else {
-      state.statid = resp.data.home.zones[0].thermostat.id	
-      def restRooms = resp.data.home.zones[0].rooms
-        restRooms.each { Room -> 
-        if ( Room.name == settings.roomname )
-           {
-                 log.debug("Room Name matches value specified in settings. Room ID is: ${Room.id}")
-                 state.roomid = Room.id
-           }
-        }
-  	}
-
-   }
- }
-
