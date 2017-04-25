@@ -61,13 +61,13 @@ def startPage() {
 }
 
 def authPage() {
-	log.debug "In authPage"
+	//log.debug "In authPage"
 	def description = null
 	log.debug "Prompting for Auth Details."
 	description = "Tap to enter Credentials."
 	return dynamicPage(name: "Credentials", title: "Authorize Connection", nextPage:mainPage, uninstall: false , install:false) {
 	   section("Generate Username and Password") {
-				input "username", "text", title: "Your Ecovent Username", required: true
+				input "username", "text", title: "Your Ecovent Username (Email Address)", required: true
 				input "password", "password", title: "Your Ecovent Password", required: true
 			}
 	}
@@ -81,7 +81,7 @@ def mainPage() {
     if (!state.vendorAccessToken){
         getVendorToken()
       }
-  	log.debug "Logging debug: ${state.vendorAccessToken}"
+  	log.debug "Ecovent System logged in"
 	   if (state.vendorAccessToken) {
        return completePage()
        } else {
@@ -107,7 +107,7 @@ def badAuthPage(){
 }
 
 def listDevices() {
-	log.debug "In listDevices"
+	//log.debug "In listDevices"
 	def options = getDeviceList()
 	dynamicPage(name: "listDevices", title: "Choose devices", install:true, uninstall:true) {
 		section("Devices") {
@@ -129,7 +129,7 @@ def getToken(){
 }
 
 def receivedHomeId() {
-	log.debug "In receivedToken"
+	//log.debug "In receivedToken"
 
 	def html = """
         <!DOCTYPE html>
@@ -202,8 +202,8 @@ def receivedHomeId() {
 }
 
 def buildRedirectUrl(endPoint) {
-	log.debug "In buildRedirectUrl"
-	log.debug("returning: " + getServerUrl() + "/api/token/${state.accessToken}/smartapps/installations/${app.id}/${endPoint}")
+	//log.debug "In buildRedirectUrl"
+	//log.debug("returning: " + getServerUrl() + "/api/token/${state.accessToken}/smartapps/installations/${app.id}/${endPoint}")
 	return getServerUrl() + "/api/token/${state.accessToken}/smartapps/installations/${app.id}/${endPoint}"
 }
 
@@ -213,17 +213,19 @@ def getDeviceList() {
 }
 
 def getRoomsCommand(){
-	log.debug "Executing 'sendCommand.getzones'"
+	//log.debug "Executing 'Get system structure'"
 	api('structure', [])
 }
 
 def installed() {
-	log.debug "Installed with settings: ${settings}"
+  log.debug "Rooms Installed"
+	//log.debug "Installed with settings: ${settings}"
 	initialize()
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
+  log.debug "Rooms Updated"
+	//log.debug "Updated with settings: ${settings}"
   	unsubscribe()
 	unschedule()
 	initialize()
@@ -237,23 +239,24 @@ def uninstalled() {
 }
 
 def initialize() {
-	log.debug "Initialized with settings: ${settings}"
+  log.debug "Rooms Initialized"
+	//log.debug "Initialized with settings: ${settings}"
 	// Pull the latest device info into state
 	getDeviceList();
   def children = getChildDevices()
   if(settings.devices) {
     	settings.devices.each { device ->
-        log.debug("Devices Inspected ${device.inspect()}")
+        //log.debug("Devices Inspected ${device.inspect()}")
 	def item = device.tokenize('|')
-        def deviceId = item[0]
+        int deviceId = Integer.parseInt(item[0])
         def deviceName = item[1]
         def existingDevices = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
-        log.debug("existingDevices Inspected ${existingDevices.inspect()}")
+        //log.debug("existingDevices Inspected ${existingDevices.inspect()}")
     	if(!existingDevices)
       {
           log.debug("Some Devices were not found....creating Child Device ${deviceName}")
           try {
-                log.debug("Creating Hot Water Device ${deviceName}")
+                log.debug("Creating Room ${deviceName}")
                 createChildDevice("Ecovent Room", deviceId + "|" + deviceName, "${deviceName}", deviceName)
  			        }
               catch (Exception e)
@@ -282,16 +285,15 @@ def getHubID(){
 }
 
 def poll() {
-	log.debug "In Poll"
 	getDeviceList();
   def children = getChildDevices()
   if(settings.devices) {
     settings.devices.each { device ->
-      log.debug("Devices Inspected ${device.inspect()}")
+      //log.debug("Devices Inspected ${device.inspect()}")
       def item = device.tokenize('|')
-      def deviceId = item[0]
+      int deviceId = Integer.parseInt(item[0])
       def deviceName = item[1]
-      def existingDevices = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceType) }
+      def existingDevices = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
       if(existingDevices) {
         existingDevices.poll()
       }
@@ -299,10 +301,18 @@ def poll() {
   }
 }
 
+def devicePoll(childDevice) {
+  def item = (childDevice.device.deviceNetworkId).tokenize('|')
+  def deviceName = item[1]
+  log.debug "Executing Poll for " + deviceName
+  api('status', childDevice, [])
+  api('prefs', childDevice, [])
+}
+
 def createChildDevice(deviceFile, dni, name, label) {
-	log.debug "In createChildDevice"
+	//log.debug "In createChildDevice"
     try{
-		def childDevice = addChildDevice("Tomforti", deviceFile, dni, getHubID(), [name: name, label: label, completedSetup: true])
+		def childDevice = addChildDevice("Tomforti", deviceFile, dni, getHubID(), [name: name + " Thermostat", label: label + " Thermostat", completedSetup: true])
 	} catch (e) {
 		log.error "Error creating device: ${e}"
 	}
@@ -320,7 +330,7 @@ private removeChildDevices(delete) {
 
 def away(childDevice) {
   def item = (childDevice.device.deviceNetworkId).tokenize('|')
-  def deviceId = item[0]
+  int deviceId = Integer.parseInt(item[0])
   def deviceName = item[1]
   log.debug "Room Status: Away"
   childDevice?.sendEvent(name: 'ignore', value: true)
@@ -331,13 +341,13 @@ def away(childDevice) {
   def myData = [ room_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('ignore', jsonStr)
+  api('ignore', childDevice, jsonStr)
   poll()
 }
 
 def home(childDevice) {
   def item = (childDevice.device.deviceNetworkId).tokenize('|')
-  def deviceId = item[0]
+  int deviceId = Integer.parseInt(item[0])
   def deviceName = item[1]
   log.debug "Room Status: In Use"
   childDevice?.sendEvent(name: 'ignore', value: false)
@@ -348,16 +358,17 @@ def home(childDevice) {
   def myData = [ room_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('ignore', jsonStr)
+  api('ignore', childDevice, jsonStr)
   poll()
 }
 
 def setpointUp(childDevice){
   def item = (childDevice.device.deviceNetworkId).tokenize('|')
-  def deviceId = item[0]
+  int deviceId = Integer.parseInt(item[0])
   def deviceName = item[1]
-  int newSetpoint = device.currentValue("thermostatSetpoint") + 1
+  int newSetpoint = childDevice.device.currentValue("thermostatSetpoint") + 1
   log.debug "Setting set point up to: ${newSetpoint}"
+  childDevice?.sendEvent(name: 'thermostatSetpoint', value: newSetpoint)
   def newSetpointCel = (newSetpoint - 32) / 1.8
   def myArray=[
     id:deviceId,
@@ -366,16 +377,17 @@ def setpointUp(childDevice){
   def myData = [ room_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('temperature', jsonStr)
+  api('temperature', childDevice, jsonStr)
   poll()
 }
 
 def setpointDown(childDevice){
   def item = (childDevice.device.deviceNetworkId).tokenize('|')
-  def deviceId = item[0]
+  int deviceId = Integer.parseInt(item[0])
   def deviceName = item[1]
-  int newSetpoint = device.currentValue("thermostatSetpoint") - 1
+  int newSetpoint = childDevice.device.currentValue("thermostatSetpoint") - 1
   log.debug "Setting set point up to: ${newSetpoint}"
+  childDevice?.sendEvent(name: 'thermostatSetpoint', value: newSetpoint)
   def newSetpointCel = (newSetpoint - 32) / 1.8
   def myArray=[
     id:deviceId,
@@ -384,11 +396,47 @@ def setpointDown(childDevice){
   def myData = [ room_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('temperature', jsonStr)
+  api('temperature', childDevice, jsonStr)
   poll()
- }
+}
 
-def heat() {
+def setCoolingSetpoint(temp, childDevice) {
+  def item = (childDevice.device.deviceNetworkId).tokenize('|')
+  int deviceId = Integer.parseInt(item[0])
+  def deviceName = item[1]
+  int newSetpoint = temp
+  log.debug "Setting set point to: ${newSetpoint}"
+  def newSetpointCel = (newSetpoint - 32) / 1.8
+  def myArray=[
+    id:deviceId,
+    setpoint:newSetpointCel,
+  ]
+  def myData = [ room_prefs:[myArray]]
+  def builder = new groovy.json.JsonBuilder(myData)
+  def jsonStr = builder.toString()
+  api('temperature', childDevice, jsonStr)
+  poll()
+}
+
+def setHeatingSetpoint(temp, childDevice) {
+  def item = (childDevice.device.deviceNetworkId).tokenize('|')
+  int deviceId = Integer.parseInt(item[0])
+  def deviceName = item[1]
+  int newSetpoint = temp
+  log.debug "Setting set point to: ${newSetpoint}"
+  def newSetpointCel = (newSetpoint - 32) / 1.8
+  def myArray=[
+    id:deviceId,
+    setpoint:newSetpointCel,
+  ]
+  def myData = [ room_prefs:[myArray]]
+  def builder = new groovy.json.JsonBuilder(myData)
+  def jsonStr = builder.toString()
+  api('temperature', childDevice, jsonStr)
+  poll()
+}
+
+def heat(childDevice) {
   childDevice?.sendEvent(name: 'thermostatMode', value: heat)
   log.debug "Setting Mode to heat"
   def myArray=[
@@ -398,11 +446,11 @@ def heat() {
   def myData = [ thermostat_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('stat', jsonStr)
+  api('stat', childDevice, jsonStr)
   poll()
 }
 
-def cool() {
+def cool(childDevice) {
   childDevice?.sendEvent(name: 'thermostatMode', value: cool)
   log.debug "Setting Mode to cool"
   def myArray=[
@@ -412,11 +460,11 @@ def cool() {
   def myData = [ thermostat_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('stat', jsonStr)
+  api('stat', childDevice, jsonStr)
   poll()
 }
 
-def fanOn() {
+def fanOn(childDevice) {
   childDevice?.sendEvent(name: 'thermostatFanMode', value: on)
   log.debug "Setting Fan to on"
   def myArray=[
@@ -426,11 +474,11 @@ def fanOn() {
   def myData = [ thermostat_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('stat', jsonStr)
+  api('stat', childDevice, jsonStr)
   poll()
 }
 
-def fanAuto() {
+def fanAuto(childDevice) {
   childDevice?.sendEvent(name: 'thermostatFanMode', value: auto)
   log.debug "Setting Fan to auto"
   def myArray=[
@@ -440,16 +488,16 @@ def fanAuto() {
   def myData = [ thermostat_prefs:[myArray]]
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
-  api('stat', jsonStr)
+  api('stat', childDevice, jsonStr)
   poll()
 }
 
 def api(method, childDevice, args = [], success = {}) {
-  log.debug "Logged in"
+  //log.debug "In API"
   def methods = [
     'status': [uri: apiUrl() + "/remote/v1/status", type: 'getstatus'],
     'prefs': [uri: apiUrl() + "/remote/v1/prefs", type: 'getprefs'],
-    'structure': [uri: apiUrl() + "/remote/v1/prefs", type: 'getstructure'],
+    'structure': [uri: apiUrl() + "/remote/v1/structure", type: 'getstructure'],
     'ignore': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'put'],
     'stat': [uri: apiUrl() + "/remote/v1/thermostat_prefs", type: 'put'],
     'temperature': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'put']
@@ -458,10 +506,8 @@ def api(method, childDevice, args = [], success = {}) {
   doRequest(request.uri, args, request.type, childDevice, success)
 }
 
- // Need to be logged in before this is called. So don't call this. Call api.
-
 def doRequest(uri, args, type, childDevice , success) {
-  log.debug "Calling $type : $uri : $args"
+  //log.debug "Calling $type : $uri : $args"
   def params = [
     uri: uri,
     requestContentType: "application/json",
@@ -470,7 +516,8 @@ def doRequest(uri, args, type, childDevice , success) {
   ]
     if (type == 'put') {
       httpPut(params) { resp ->
-      log.debug("Put status: "+resp.status)
+      log.debug("Sent to Ecovent")
+
       }
     } else if (type == 'getstatus') {
       httpGet(params) { resp ->
@@ -495,9 +542,9 @@ def doRequest(uri, args, type, childDevice , success) {
 private statusResponse(resp,childDevice) {
   if(resp.status == 200) {
         def item = (childDevice.device.deviceNetworkId).tokenize('|')
-        def deviceId = item[0]
+        int deviceId = Integer.parseInt(item[0])
         def deviceName = item[1]
-        log.debug("Get status: "+resp.status)
+        //log.debug("Get status: "+resp.status)
         def id = resp.data.room_status[deviceId - 1].id //improve this
         def humid = Math.round(resp.data.room_status[deviceId - 1].humidity)
       	def temp = Math.round((resp.data.room_status[deviceId - 1].temp * 1.8 ) + 32)
@@ -513,9 +560,9 @@ private statusResponse(resp,childDevice) {
 private prefsResponse(resp,childDevice) {
   if(resp.status == 200) {
         def item = (childDevice.device.deviceNetworkId).tokenize('|')
-        def deviceId = item[0]
+        int deviceId = Integer.parseInt(item[0])
         def deviceName = item[1]
-        log.debug("Get Prefs: "+resp.status)
+        //log.debug("Get Prefs: "+resp.status)
     	  def statMode = resp.data.mode
       	def fanMode = resp.data.thermostat_prefs[0].fan //improve this
       	def roomset = Math.round((resp.data.room_prefs[deviceId - 1].setpoint * 1.8 ) + 32) //improves this
@@ -533,61 +580,19 @@ private prefsResponse(resp,childDevice) {
 
 private structureResponse(resp) {
   if(resp.status == 200) {
-        log.debug("Get Structure: "+resp.status)
+        //log.debug("Get Structure: "+resp.status)
         state.statid = resp.data.home.zones[0].thermostat.id
     	  def restDevices = resp.data.home.zones[0].rooms
         def ecoventDevices = []
-        log.debug("Executing parseZoneResponse.successTrue")
+        //log.debug("Executing parseZoneResponse.successTrue")
         restDevices.each { ecovent -> ecoventDevices << ["${ecovent.id}|${ecovent.name}":"${ecovent.name}"] }
-        log.debug(ecoventDevices)
+        //log.debug(ecoventDevices)
         return ecoventDevices
         }
         else if(resp.status == 201)
         {
           log.debug("Something was created/updated")
         }
-}
-
-def setCoolingSetpoint(temp, childDevice) {
-    def item = (childDevice.device.deviceNetworkId).tokenize('|')
-    def deviceId = item[0]
-    def deviceName = item[1]
-    int newSetpoint = temp
-  	log.debug "Setting set point up to: ${newSetpoint}"
-  	def newSetpointCel = (newSetpoint - 32) / 1.8
-  	def myArray=[
-    	id:deviceId,
-    	setpoint:newSetpointCel,
-  	]
-  	def myData = [ room_prefs:[myArray]]
-  	def builder = new groovy.json.JsonBuilder(myData)
-  	def jsonStr = builder.toString()
-  	api('temperature', childDevice, jsonStr)
-  	poll()
-}
-
-def setHeatingSetpoint(temp, childDevice) {
-    def item = (childDevice.device.deviceNetworkId).tokenize('|')
-    def deviceId = item[0]
-    def deviceName = item[1]
-    int newSetpoint = temp
-  	log.debug "Setting set point up to: ${newSetpoint}"
-  	def newSetpointCel = (newSetpoint - 32) / 1.8
-  	def myArray=[
-    	id:deviceId,
-    	setpoint:newSetpointCel,
-  	]
-  	def myData = [ room_prefs:[myArray]]
-  	def builder = new groovy.json.JsonBuilder(myData)
-  	def jsonStr = builder.toString()
-  	api('temperature', childDevice, jsonStr)
-  	poll()
-}
-
-def devicePoll(childDevice) {
-  log.debug "Executing 'poll'"
-  api('status', childDevice, [])
-  api('prefs', childDevice, [])
 }
 
 def getVendorToken(method = null, args = [], success = {}) {
@@ -602,10 +607,10 @@ def getVendorToken(method = null, args = [], success = {}) {
       log.debug "Ecovent logging failed, status = ${response.status}"
     }
     else {
-    data.auth = response.data
-    state.vendorAccessToken = data.auth.cloud_authorization
-    log.debug data.auth
-    api(method, args, success)
+    state.vendorAccessToken = response.data.cloud_authorization
+    log.debug "Setting up " + response.data.first_name + " " + response.data.last_name + "'s Ecovent System"
+    //log.debug "Ecovent Token is " + response.data.cloud_authorization
+    //api(method, args, success)
   }
   }
 }
