@@ -8,9 +8,6 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
  preferences {
-  input("username", "text", title: "Username", description: 'Your Ecovent username (e-mail address)')
-  input("password", "password", title: "Password", description: 'Your Ecovent password')
-  input("roomname", "text", title: "Room Name", description: 'Room Name, Must be Exact from Ecovent App')
  }
  metadata {
   definition (name: "Ecovent Room", namespace: "Tomforti", author: "Tom Forti") {
