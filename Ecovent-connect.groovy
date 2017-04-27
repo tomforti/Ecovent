@@ -270,8 +270,8 @@ def initialize() {
   statusPoll()
   prefsPoll()
 	// Schedule it to run every 5 minutes
-	runEvery5Minutes("prefsPoll")
-  runEvery1Minute("statusPoll")
+	runEvery10Minutes("prefsPoll")
+  runEvery5Minutes("statusPoll")
 }
 
 
