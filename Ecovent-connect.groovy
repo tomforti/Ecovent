@@ -267,9 +267,11 @@ def initialize() {
 		}
     }
 
-  poll()
+  statusPoll()
+  prefsPoll()
 	// Schedule it to run every 5 minutes
-	runEvery5Minutes("poll")
+	runEvery5Minutes("prefsPoll")
+  runEvery1Minute("statusPoll")
 }
 
 
@@ -284,29 +286,22 @@ def getHubID(){
     return hubID
 }
 
-def poll() {
-	getDeviceList();
-  def children = getChildDevices()
-  if(settings.devices) {
-    settings.devices.each { device ->
-      //log.debug("Devices Inspected ${device.inspect()}")
-      def item = device.tokenize('|')
-      int deviceId = Integer.parseInt(item[0])
-      def deviceName = item[1]
-      def existingDevices = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
-      if(existingDevices) {
-        existingDevices.poll()
-      }
-	   }
-  }
+def statusPoll() {
+  log.debug "Executing Status Poll"
+  api('status', [])
+}
+
+def prefsPoll() {
+  log.debug "Executing Prefs Poll"
+  api('prefs', [])
 }
 
 def devicePoll(childDevice) {
   def item = (childDevice.device.deviceNetworkId).tokenize('|')
   def deviceName = item[1]
-  log.debug "Executing Poll for " + deviceName
-  api('status', childDevice, [])
-  api('prefs', childDevice, [])
+  log.debug deviceName + " requested a poll"
+  api('status', [])
+  api('prefs', [])
 }
 
 def createChildDevice(deviceFile, dni, name, label) {
@@ -342,7 +337,6 @@ def away(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('ignore', childDevice, jsonStr)
-  poll()
 }
 
 def home(childDevice) {
@@ -359,7 +353,6 @@ def home(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('ignore', childDevice, jsonStr)
-  poll()
 }
 
 def setpointUp(childDevice){
@@ -378,7 +371,6 @@ def setpointUp(childDevice){
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('temperature', childDevice, jsonStr)
-  poll()
 }
 
 def setpointDown(childDevice){
@@ -397,7 +389,6 @@ def setpointDown(childDevice){
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('temperature', childDevice, jsonStr)
-  poll()
 }
 
 def setCoolingSetpoint(temp, childDevice) {
@@ -415,7 +406,6 @@ def setCoolingSetpoint(temp, childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('temperature', childDevice, jsonStr)
-  poll()
 }
 
 def setHeatingSetpoint(temp, childDevice) {
@@ -433,7 +423,6 @@ def setHeatingSetpoint(temp, childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('temperature', childDevice, jsonStr)
-  poll()
 }
 
 def heat(childDevice) {
@@ -447,7 +436,6 @@ def heat(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('stat', childDevice, jsonStr)
-  poll()
 }
 
 def cool(childDevice) {
@@ -461,7 +449,6 @@ def cool(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('stat', childDevice, jsonStr)
-  poll()
 }
 
 def fanOn(childDevice) {
@@ -475,7 +462,6 @@ def fanOn(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('stat', childDevice, jsonStr)
-  poll()
 }
 
 def fanAuto(childDevice) {
@@ -489,7 +475,6 @@ def fanAuto(childDevice) {
   def builder = new groovy.json.JsonBuilder(myData)
   def jsonStr = builder.toString()
   api('stat', childDevice, jsonStr)
-  poll()
 }
 
 def api(method, childDevice, args = [], success = {}) {
@@ -498,9 +483,9 @@ def api(method, childDevice, args = [], success = {}) {
     'status': [uri: apiUrl() + "/remote/v1/status", type: 'getstatus'],
     'prefs': [uri: apiUrl() + "/remote/v1/prefs", type: 'getprefs'],
     'structure': [uri: apiUrl() + "/remote/v1/structure", type: 'getstructure'],
-    'ignore': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'put'],
-    'stat': [uri: apiUrl() + "/remote/v1/thermostat_prefs", type: 'put'],
-    'temperature': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'put']
+    'ignore': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'putroom'],
+    'stat': [uri: apiUrl() + "/remote/v1/thermostat_prefs", type: 'putstat'],
+    'temperature': [uri: apiUrl() + "/remote/v1/room_prefs", type: 'putroom']
   ]
   def request = methods.getAt(method)
   doRequest(request.uri, args, request.type, childDevice, success)
@@ -514,19 +499,24 @@ def doRequest(uri, args, type, childDevice , success) {
     headers: ['Authorization': "token=${state.vendorAccessToken}"],
     body: args
   ]
-    if (type == 'put') {
+    if (type == 'putroom') {
       httpPut(params) { resp ->
       log.debug("Sent to Ecovent")
-
+      putroomResponse(resp)
       }
-    } else if (type == 'getstatus') {
+    } else if (type == 'putstat') {
+      httpPut(params) { resp ->
+        putstatResponse(resp)
+        }
+       }
+      else if (type == 'getstatus') {
       httpGet(params) { resp ->
-        statusResponse(resp, childDevice)
+        statusResponse(resp)
         }
 	     }
       else if (type == 'getprefs') {
       httpGet(params) { resp ->
-        prefsResponse(resp, childDevice)
+        prefsResponse(resp)
         }
       }
       else if (type == 'getstructure') {
@@ -538,41 +528,93 @@ def doRequest(uri, args, type, childDevice , success) {
         log.debug("error")
       }
 }
-
-private statusResponse(resp,childDevice) {
+private putroomResponse(resp) {
   if(resp.status == 200) {
-        def item = (childDevice.device.deviceNetworkId).tokenize('|')
-        int deviceId = Integer.parseInt(item[0])
-        def deviceName = item[1]
-        //log.debug("Get status: "+resp.status)
-        def id = resp.data.room_status[deviceId - 1].id //improve this
-        def humid = Math.round(resp.data.room_status[deviceId - 1].humidity)
-      	def temp = Math.round((resp.data.room_status[deviceId - 1].temp * 1.8 ) + 32)
-      	childDevice?.sendEvent(name: 'humidity', value: humid)
-      	childDevice?.sendEvent(name: 'thermostatFanMode', value: fanMode)
-      	childDevice?.sendEvent(name: 'thermostatMode', value: statMode)
-      	childDevice?.sendEvent(name: 'temperature', value: temp)
+        if(settings.devices) {
+          def children = getChildDevices()
+          settings.devices.each { device ->
+          log.debug("Room ${device.inspect()} updating rooms")
+          def item = device.tokenize('|')
+          int deviceId = Integer.parseInt(item[0])
+          def deviceName = item[1]
+          def roomset = Math.round((resp.data.room_prefs[deviceId - 1].setpoint * 1.8 ) + 32) //improves this
+          def ignore = resp.data.room_prefs[deviceId - 1].ignore //improve this
+          def childDevice = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
+          childDevice?.sendEvent(name: 'thermostatSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'heatingSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'coolingSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'ignore', value: ignore)
+         }
+       }   
+    }else{
+        log.debug("Get status: "+resp.status)
+    }
+  }
+
+private putstatResponse(resp) {
+  if(resp.status == 200) {
+        if(settings.devices) {
+          def children = getChildDevices()
+          settings.devices.each { device ->
+          log.debug("Room ${device.inspect()} updating rooms")
+          def item = device.tokenize('|')
+          int deviceId = Integer.parseInt(item[0])
+          def deviceName = item[1]
+          def statMode = resp.data.thermostat_prefs[0].mode
+          def fanMode = resp.data.thermostat_prefs[0].fan //improve this
+          def childDevice = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
+          childDevice?.sendEvent(name: 'thermostatFanMode', value: fanMode)
+          childDevice?.sendEvent(name: 'thermostatMode', value: statMode)
+         }
+       }
+    }else{
+        log.debug("Get status: "+resp.status)
+    }
+  }
+
+private statusResponse(resp) {
+  if(resp.status == 200) {
+        if(settings.devices) {
+          def children = getChildDevices()
+          settings.devices.each { device ->
+          log.debug("Room ${device.inspect()} updating status")
+          def item = device.tokenize('|')
+          int deviceId = Integer.parseInt(item[0])
+          def deviceName = item[1]
+          def humid = Math.round(resp.data.room_status[deviceId - 1].humidity)
+          def temp = Math.round((resp.data.room_status[deviceId - 1].temp * 1.8 ) + 32)
+          def childDevice = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
+          childDevice?.sendEvent(name: 'humidity', value: humid)
+          childDevice?.sendEvent(name: 'temperature', value: temp)
+         }
+       } 	
     }else{
         log.debug("Get status: "+resp.status)
     }
 }
 
-private prefsResponse(resp,childDevice) {
+private prefsResponse(resp) {
   if(resp.status == 200) {
-        def item = (childDevice.device.deviceNetworkId).tokenize('|')
-        int deviceId = Integer.parseInt(item[0])
-        def deviceName = item[1]
-        //log.debug("Get Prefs: "+resp.status)
-    	  def statMode = resp.data.mode
-      	def fanMode = resp.data.thermostat_prefs[0].fan //improve this
-      	def roomset = Math.round((resp.data.room_prefs[deviceId - 1].setpoint * 1.8 ) + 32) //improves this
-      	def ignore = resp.data.room_prefs[deviceId - 1].ignore //improve this
-      	childDevice?.sendEvent(name: 'thermostatFanMode', value: fanMode)
-      	childDevice?.sendEvent(name: 'thermostatMode', value: statMode)
-      	childDevice?.sendEvent(name: 'thermostatSetpoint', value: roomset)
-      	childDevice?.sendEvent(name: 'heatingSetpoint', value: roomset)
-      	childDevice?.sendEvent(name: 'coolingSetpoint', value: roomset)
-      	childDevice?.sendEvent(name: 'ignore', value: ignore)
+        if(settings.devices) {
+          def children = getChildDevices()
+          settings.devices.each { device ->
+          log.debug("Room ${device.inspect()} updating Prefs")
+          def item = device.tokenize('|')
+          int deviceId = Integer.parseInt(item[0])
+          def deviceName = item[1]
+          def statMode = resp.data.thermostat_prefs[0].mode
+          def fanMode = resp.data.thermostat_prefs[0].fan //improve this
+          def roomset = Math.round((resp.data.room_prefs[deviceId - 1].setpoint * 1.8 ) + 32) //improves this
+          def ignore = resp.data.room_prefs[deviceId - 1].ignore //improve this
+          def childDevice = children.find{ d -> d.deviceNetworkId.contains(deviceId + "|" + deviceName) }
+          childDevice?.sendEvent(name: 'thermostatFanMode', value: fanMode)
+          childDevice?.sendEvent(name: 'thermostatMode', value: statMode)
+          childDevice?.sendEvent(name: 'thermostatSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'heatingSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'coolingSetpoint', value: roomset)
+          childDevice?.sendEvent(name: 'ignore', value: ignore)
+         }
+       } 	
     }else{
         log.debug("Get status: "+resp.status)
     }
